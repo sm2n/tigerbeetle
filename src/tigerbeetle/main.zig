@@ -62,7 +62,6 @@ pub fn main() !void {
 }
 
 const Command = struct {
-    dir_fd: os.fd_t,
     fd: os.fd_t,
     io: IO,
     storage: Storage,
@@ -74,14 +73,7 @@ const Command = struct {
         path: [:0]const u8,
         must_create: bool,
     ) !void {
-        // TODO Resolve the parent directory properly in the presence of .. and symlinks.
-        // TODO Handle physical volumes where there is no directory to fsync.
-        const dirname = std.fs.path.dirname(path) orelse ".";
-        command.dir_fd = try IO.open_dir(dirname);
-        errdefer os.close(command.dir_fd);
-
-        const basename = std.fs.path.basename(path);
-        command.fd = try IO.open_file(command.dir_fd, basename, data_file_size_min, if (must_create) .create else .open);
+        command.fd = try IO.open_file(path, data_file_size_min, if (must_create) .create else .open);
         errdefer os.close(command.fd);
 
         command.io = try IO.init(128, 0);
@@ -98,8 +90,9 @@ const Command = struct {
         command.message_pool.deinit(allocator);
         command.storage.deinit();
         command.io.deinit();
+
+        // We use synchronous writes everywhere, so no need to fsync here
         os.close(command.fd);
-        os.close(command.dir_fd);
     }
 
     pub fn format(allocator: mem.Allocator, options: SuperBlock.FormatOptions, path: [:0]const u8) !void {

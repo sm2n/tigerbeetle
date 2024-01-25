@@ -120,23 +120,14 @@ pub const AOF = struct {
     fd: os.fd_t,
     last_checksum: ?u128 = null,
 
-    /// Create an AOF given an absolute path. Handles opening the
+    /// Create an AOF given a path. Handles opening the
     /// dir_fd and ensuring everything (including the dir) is
     /// fsync'd appropriately.
-    pub fn from_absolute_path(absolute_path: []const u8) !AOF {
-        const dirname = std.fs.path.dirname(absolute_path) orelse ".";
-        const dir_fd = try IO.open_dir(dirname);
-        errdefer os.close(dir_fd);
-
-        const basename = std.fs.path.basename(absolute_path);
-
-        return AOF.init(dir_fd, basename);
-    }
-
-    fn init(dir_fd: os.fd_t, relative_path: []const u8) !AOF {
-        const fd = try IO.open_file(dir_fd, relative_path, 0, .create_or_open);
+    fn init(path: []const u8) !AOF {
+        const fd = try IO.open_file(dir_fd, path, 0, .create_or_open);
         errdefer os.close(fd);
 
+        // TODO: This design doesn't work with block devices
         try os.lseek_END(fd, 0);
 
         return AOF{ .fd = fd };

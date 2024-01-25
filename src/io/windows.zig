@@ -1025,13 +1025,19 @@ pub const IO = struct {
     ///   The caller is responsible for ensuring that the parent directory inode is durable.
     /// - Verifies that the file size matches the expected file size before returning.
     pub fn open_file(
-        dir_handle: os.fd_t,
-        relative_path: []const u8,
+        path: []const u8,
         size: u64,
         method: enum { create, create_or_open, open },
     ) !os.fd_t {
-        assert(relative_path.len > 0);
+        assert(path.len > 0);
         assert(size % constants.sector_size == 0);
+
+        // TODO: try to sync file inode directory listing through symlink
+        const dir_fd = try IO.open_dir(std.fs.path.dirname(path) orelse ".");
+        defer os.close(dir_fd);
+
+        const relative_path = std.fs.path.basename(path);
+        assert(relative_path.len > 0);
 
         const handle = switch (method) {
             .open => try open_file_handle(relative_path, .open),
@@ -1079,7 +1085,6 @@ pub const IO = struct {
         // We have no way to open a directory with write access.
         //
         // try os.fsync(dir_handle);
-        _ = dir_handle;
 
         const file_size = try os.windows.GetFileSizeEx(handle);
         if (file_size < size) @panic("data file inode size was truncated or corrupted");
